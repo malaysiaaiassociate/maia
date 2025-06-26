@@ -55,17 +55,17 @@ try:
     st.session_state.messages = joblib.load(
         f'data/{st.session_state.chat_id}-st_messages'
     )
-    st.session_state.gemini_history = joblib.load(
-        f'data/{st.session_state.chat_id}-gemini_messages'
+    st.session_state._history = joblib.load(
+        f'data/{st.session_state.chat_id}-_messages'
     )
     print('old cache')
 except:
     st.session_state.messages = []
-    st.session_state.gemini_history = []
+    st.session_state._history = []
     print('new_cache made')
-st.session_state.model = genai.GenerativeModel('gemini-pro')
+st.session_state.model = genai.GenerativeModel('gemini-2.5-flash')
 st.session_state.chat = st.session_state.model.start_chat(
-    history=st.session_state.gemini_history,
+    history=st.session_state._history,
 )
 
 # Display chat messages from history on app rerun
@@ -125,7 +125,7 @@ if prompt := st.chat_input('Your message here...'):
             avatar=AI_AVATAR_ICON,
         )
     )
-    st.session_state.gemini_history = st.session_state.chat.history
+    st.session_state._history = st.session_state.chat.history
     # Save to file
     joblib.dump(
         st.session_state.messages,

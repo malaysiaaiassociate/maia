@@ -10,7 +10,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 new_chat_id = f'{time.time()}'
 MODEL_ROLE = 'ai'
-AI_AVATAR_ICON = 'MAIA'
+AI_AVATAR_ICON = 'Ⓜ️'
 
 # Create a data/ folder if it doesn't already exist
 try:

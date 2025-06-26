@@ -4,53 +4,49 @@ import joblib
 import streamlit as st
 import google.generativeai as genai
 from dotenv import load_dotenv
+
 load_dotenv()
-GOOGLE_API_KEY=os.environ.get('GOOGLE_API_KEY')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
 genai.configure(api_key=GOOGLE_API_KEY)
 
-new_chat_id = f'{time.time()}'
+# Constants
 MODEL_ROLE = 'ai'
 AI_AVATAR_ICON = 'Ⓜ️'
+new_chat_id = f'{time.time()}'
 
-# Create a data/ folder if it doesn't already exist
-try:
-    os.mkdir('data/')
-except:
-    # data/ folder already exists
-    pass
+# Initialize session state
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+if '_history' not in st.session_state:
+    st.session_state._history = []
+if 'chat_id' not in st.session_state:
+    st.session_state.chat_id = new_chat_id
+if 'chat_title' not in st.session_state:
+    st.session_state.chat_title = f'ChatSession-{new_chat_id}'
 
-# Load past chats (if available)
+# Create data directory if not exists
+os.makedirs('data/', exist_ok=True)
+
+# Load past chats
 try:
-    past_chats: dict = joblib.load('data/past_chats_list')
+    past_chats = joblib.load('data/past_chats_list')
 except:
     past_chats = {}
 
-# Sidebar allows a list of past chats
+# Sidebar for past chats
 with st.sidebar:
     st.write('# Past Chats')
-    if st.session_state.get('chat_id') is None:
-        st.session_state.chat_id = st.selectbox(
-            label='Pick a past chat',
-            options=[new_chat_id] + list(past_chats.keys()),
-            format_func=lambda x: past_chats.get(x, 'New Chat'),
-            placeholder='_',
-        )
-    else:
-        # This will happen the first time AI response comes in
-        st.session_state.chat_id = st.selectbox(
-            label='Pick a past chat',
-            options=[new_chat_id, st.session_state.chat_id] + list(past_chats.keys()),
-            index=1,
-            format_func=lambda x: past_chats.get(x, 'New Chat' if x != st.session_state.chat_id else st.session_state.chat_title),
-            placeholder='_',
-        )
-    # Save new chats after a message has been sent to AI
-    # TODO: Give user a chance to name chat
+    st.session_state.chat_id = st.selectbox(
+        label='Pick a past chat',
+        options=[new_chat_id] + list(past_chats.keys()),
+        format_func=lambda x: past_chats.get(x, 'New Chat'),
+        index=0,
+    )
     st.session_state.chat_title = f'ChatSession-{st.session_state.chat_id}'
 
-st.write('# Chat with Gemini')
+st.title('Chat with Gemini')
 
-# Chat history (allows to ask multiple questions)
+# Load chat history
 try:
     st.session_state.messages = joblib.load(
         f'data/{st.session_state.chat_id}-st_messages'
@@ -58,17 +54,17 @@ try:
     st.session_state._history = joblib.load(
         f'data/{st.session_state.chat_id}-_messages'
     )
-    print('old cache')
 except:
     st.session_state.messages = []
     st.session_state._history = []
-    print('new_cache made')
+
+# Initialize model
 st.session_state.model = genai.GenerativeModel('gemini-2.5-flash')
 st.session_state.chat = st.session_state.model.start_chat(
-    history=st.session_state._history,
+    history=st.session_state._history
 )
 
-# Display chat messages from history on app rerun
+# Display messages
 for message in st.session_state.messages:
     with st.chat_message(
         name=message['role'],
@@ -76,62 +72,52 @@ for message in st.session_state.messages:
     ):
         st.markdown(message['content'])
 
-# React to user input
+# User input
 if prompt := st.chat_input('Your message here...'):
-    # Save this as a chat for later
-    if st.session_state.chat_id not in past_chats.keys():
+    # Save new chat
+    if st.session_state.chat_id not in past_chats:
         past_chats[st.session_state.chat_id] = st.session_state.chat_title
         joblib.dump(past_chats, 'data/past_chats_list')
-    # Display user message in chat message container
+
+    # Display user message
     with st.chat_message('user'):
         st.markdown(prompt)
-    # Add user message to chat history
-    st.session_state.messages.append(
-        dict(
-            role='user',
-            content=prompt,
-        )
-    )
-    ## Send message to AI
-    response = st.session_state.chat.send_message(
-        prompt,
-        stream=True,
-    )
-    # Display assistant response in chat message container
-    with st.chat_message(
-        name=MODEL_ROLE,
-        avatar=AI_AVATAR_ICON,
-    ):
+    
+    st.session_state.messages.append({
+        'role': 'user',
+        'content': prompt
+    })
+
+    # Get AI response
+    response = st.session_state.chat.send_message(prompt, stream=True)
+    
+    # Display AI response
+    with st.chat_message(MODEL_ROLE, avatar=AI_AVATAR_ICON):
         message_placeholder = st.empty()
         full_response = ''
-        assistant_response = response
-        # Streams in a chunk at a time
+        
         for chunk in response:
-            # Simulate stream of chunk
-            # TODO: Chunk missing `text` if API stops mid-stream ("safety"?)
-            for ch in chunk.text.split(' '):
-                full_response += ch + ' '
+            for word in chunk.text.split(' '):
+                full_response += word + ' '
                 time.sleep(0.05)
-                # Rewrites with a cursor at end
                 message_placeholder.write(full_response + '▌')
-        # Write full message with placeholder
+        
         message_placeholder.write(full_response)
 
-    # Add assistant response to chat history
-    st.session_state.messages.append(
-        dict(
-            role=MODEL_ROLE,
-            content=st.session_state.chat.history[-1].parts[0].text,
-            avatar=AI_AVATAR_ICON,
-        )
-    )
+    # Update history
+    st.session_state.messages.append({
+        'role': MODEL_ROLE,
+        'content': full_response,
+        'avatar': AI_AVATAR_ICON
+    })
     st.session_state._history = st.session_state.chat.history
-    # Save to file
+
+    # Save conversation
     joblib.dump(
         st.session_state.messages,
-        f'data/{st.session_state.chat_id}-st_messages',
+        f'data/{st.session_state.chat_id}-st_messages'
     )
     joblib.dump(
-        st.session_state.gemini_history,
-        f'data/{st.session_state.chat_id}-gemini_messages',
+        st.session_state._history,
+        f'data/{st.session_state.chat_id}-_messages'
     )

@@ -17,7 +17,7 @@ genai.configure(api_key=GOOGLE_API_KEY)
 # Constants
 MODEL_ROLE = 'ai'
 AI_AVATAR_ICON = 'Ⓜ️'
-MODEL_NAME = "gemini-1.5-flash-latest"
+MODEL_NAME = "gemini-2.5-flash"
 MAX_HISTORY_LENGTH = 10
 SEARCH_ENGINE_ID = os.getenv('SEARCH_ENGINE_ID', '95594d69ad5634e0d')
 GNEWS_API_KEY = os.getenv('GNEWS_API_KEY')
